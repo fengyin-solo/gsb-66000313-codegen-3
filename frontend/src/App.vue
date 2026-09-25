@@ -1,5 +1,6 @@
 <template>
-  <div class="min-h-screen bg-slate-900 text-slate-200">
+  <ShareView v-if="sharePayload" :payload="sharePayload" />
+  <div v-else class="min-h-screen bg-slate-900 text-slate-200">
     <header class="border-b border-slate-700 px-6 py-4">
       <h1 class="text-2xl font-bold text-cyan-400">正则表达式可视化调试器</h1>
       <p class="text-sm text-slate-500 mt-1">NFA 状态机可视化 · 逐步匹配高亮 · 分组捕获 · 回溯追踪</p>
@@ -8,6 +9,7 @@
     <div class="flex flex-col lg:flex-row gap-4 p-4">
       <div class="lg:w-1/4 space-y-4">
         <RegexEditor />
+        <SharePanel />
         <TemplateLibrary />
       </div>
 
@@ -58,13 +60,28 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRegexStore } from './store/regex'
+import { parseShareHash } from './utils/share'
 import RegexEditor from './components/RegexEditor.vue'
 import NfaVisualizer from './components/NfaVisualizer.vue'
 import MatchHighlight from './components/MatchHighlight.vue'
 import TemplateLibrary from './components/TemplateLibrary.vue'
+import SharePanel from './components/SharePanel.vue'
+import ShareView from './components/ShareView.vue'
 
 const store = useRegexStore()
-onMounted(() => store.execute())
+
+// hash 路由：#/share/<payload> 进入只读分享页，其余为编辑器。
+// 分享页不修改 store，本地正在编辑的用例不会被覆盖。
+const sharePayload = ref<string | null>(parseShareHash(window.location.hash))
+function onHashChange() {
+  sharePayload.value = parseShareHash(window.location.hash)
+}
+
+onMounted(() => {
+  window.addEventListener('hashchange', onHashChange)
+  store.execute()
+})
+onUnmounted(() => window.removeEventListener('hashchange', onHashChange))
 </script>

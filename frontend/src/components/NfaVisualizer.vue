@@ -2,7 +2,7 @@
   <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-sm font-bold text-slate-400">NFA 状态机可视化</h3>
-      <span v-if="store.nfa" class="text-xs text-slate-500">{{ store.nfa.states.length }} 状态 · {{ store.nfa.transitions.length }} 转移</span>
+      <span v-if="nfa" class="text-xs text-slate-500">{{ nfa.states.length }} 状态 · {{ nfa.transitions.length }} 转移</span>
     </div>
     <canvas ref="canvasRef" width="800" height="500" class="w-full bg-slate-900 rounded-lg border border-slate-700"></canvas>
     <div class="mt-2 flex gap-4 text-xs text-slate-500">
@@ -15,30 +15,42 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRegexStore } from '../store/regex'
+import type { NFA, MatchResult } from '../types'
+
+// 可选 props：传入则使用传入值（只读分享页），否则回退到编辑器 store
+const props = defineProps<{
+  nfa?: NFA | null
+  matchResult?: MatchResult | null
+  currentStep?: number
+}>()
 
 const store = useRegexStore()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
+const nfa = computed(() => props.nfa !== undefined ? props.nfa : store.nfa)
+const result = computed(() => props.matchResult !== undefined ? props.matchResult : store.matchResult)
+const currentStepValue = computed(() => props.currentStep !== undefined ? props.currentStep : store.currentStep)
+
 function draw() {
   const canvas = canvasRef.value
-  if (!canvas || !store.nfa) return
+  if (!canvas || !nfa.value) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 
   const activeStates = new Set<number>()
-  if (store.matchResult && store.currentStep < store.matchResult.steps.length) {
-    const step = store.matchResult.steps[store.currentStep]
+  if (result.value && currentStepValue.value < result.value.steps.length) {
+    const step = result.value.steps[currentStepValue.value]
     if (step) { activeStates.add(step.currentState); activeStates.add(step.nextState) }
   }
 
   // Draw transitions
-  store.nfa.transitions.forEach(t => {
-    const from = store.nfa!.states.find(s => s.id === t.from)
-    const to = store.nfa!.states.find(s => s.id === t.to)
+  nfa.value.transitions.forEach(t => {
+    const from = nfa.value!.states.find(s => s.id === t.from)
+    const to = nfa.value!.states.find(s => s.id === t.to)
     if (!from || !to) return
 
     const isActive = activeStates.has(t.from) && activeStates.has(t.to)
@@ -83,7 +95,7 @@ function draw() {
   })
 
   // Draw states
-  store.nfa.states.forEach(s => {
+  nfa.value.states.forEach(s => {
     const isActive = activeStates.has(s.id)
     const color = s.isStart ? '#06b6d4' : s.isAccept ? '#22c55e' : isActive ? '#f97316' : '#475569'
 
@@ -128,5 +140,5 @@ function draw() {
 }
 
 onMounted(() => { draw() })
-watch(() => [store.nfa, store.currentStep], () => draw(), { deep: true })
+watch([nfa, result, currentStepValue], () => draw(), { deep: true })
 </script>

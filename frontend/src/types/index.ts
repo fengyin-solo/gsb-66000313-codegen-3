@@ -49,6 +49,12 @@ export interface RegexTemplate {
   category: string
 }
 
+export interface ShareCase {
+  version: number
+  pattern: string
+  testString: string
+}
+
 export interface ASTNode {
   type: 'char' | 'star' | 'plus' | 'question' | 'or' | 'concat' | 'group' | 'dot' | 'anchor' | 'charclass' | 'digit' | 'word' | 'space'
   value?: string

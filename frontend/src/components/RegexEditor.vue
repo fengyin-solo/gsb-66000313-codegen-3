@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRegexStore } from '../store/regex'
 
 const store = useRegexStore()
@@ -42,9 +42,16 @@ function onTestInput() {
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => { store.setTestString(localTestString.value) }, 300)
 }
-function execute() {
+// 立即把输入框内容同步到 store（生成分享链接前调用，避免防抖延迟导致链接内容过期）
+function flush() {
+  clearTimeout(debounceTimer)
   store.setPattern(localPattern.value)
   store.setTestString(localTestString.value)
+}
+function execute() {
+  flush()
   store.execute()
 }
+onMounted(() => window.addEventListener('regex:flush', flush))
+onUnmounted(() => window.removeEventListener('regex:flush', flush))
 </script>

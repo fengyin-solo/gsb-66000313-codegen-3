@@ -35,7 +35,7 @@ interface StateNode {
   epsilonTransitions: number[]
 }
 
-function buildNFA(pattern: string): { states: StateNode[]; startState: number; acceptStates: number[] } {
+export function buildNFA(pattern: string): { states: StateNode[]; startState: number; acceptStates: number[] } {
   const states: StateNode[] = []
   let stateCounter = 0
   let pos = 0
@@ -208,7 +208,7 @@ function matchTransition(state: StateNode, symbol: string): number[] {
   return results
 }
 
-function runMatch(states: StateNode[], startState: number, input: string): MatchResult {
+export function runMatch(states: StateNode[], startState: number, input: string): MatchResult {
   const steps: MatchStep[] = []
   let backtracks = 0
   let stepIndex = 0
@@ -389,6 +389,19 @@ export function parseAST(pattern: string): ASTNode {
   }
 
   return parseOr()
+}
+
+/**
+ * 对一组正则+测试文本独立执行完整分析（NFA/匹配/AST）。
+ * 纯函数，不读写任何 store 状态——分享页用它复现结果，不会改动本地正在编辑的用例。
+ */
+export function analyzeCase(pattern: string, testString: string): { nfa: NFA; matchResult: MatchResult; ast: ASTNode } {
+  const built = buildNFA(pattern)
+  return {
+    nfa: computeNFA(built),
+    matchResult: runMatch(built.states, built.startState, testString),
+    ast: parseAST(pattern)
+  }
 }
 
 export const useRegexStore = defineStore('regex', () => {
