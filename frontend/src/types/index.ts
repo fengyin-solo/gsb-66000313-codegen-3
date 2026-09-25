@@ -55,3 +55,16 @@ export interface ASTNode {
   children?: ASTNode[]
   groupIndex?: number
 }
+
+export interface SharePayload {
+  v: number
+  pattern: string
+  testString: string
+}
+
+export type ShareErrorCode = 'invalid' | 'too-large' | 'unsupported-version'
+
+export interface ShareError {
+  code: ShareErrorCode
+  message: string
+}

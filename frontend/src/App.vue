@@ -5,9 +5,32 @@
       <p class="text-sm text-slate-500 mt-1">NFA 状态机可视化 · 逐步匹配高亮 · 分组捕获 · 回溯追踪</p>
     </header>
 
+    <!-- 只读分享视图横幅 -->
+    <div v-if="store.isSharedView" class="mx-4 mt-4 flex items-center justify-between gap-3 bg-indigo-900/50 border border-indigo-600 rounded-lg px-4 py-3">
+      <div class="text-sm text-indigo-200">
+        🔗 <b>只读分享视图</b>：正在查看他人分享的用例，高亮、分组与步骤与创建时一致。此视图不能修改原用例，编辑操作将被拒绝。
+      </div>
+      <button @click="exitShare" class="shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded text-sm font-bold">退出分享，返回本地编辑</button>
+    </div>
+
+    <!-- 分享链接恢复失败说明（不影响本地用例） -->
+    <div v-if="store.shareError" class="mx-4 mt-4 flex items-center justify-between gap-3 bg-red-900/40 border border-red-700 rounded-lg px-4 py-3">
+      <div class="text-sm text-red-200">
+        ⚠ <b>分享链接打开失败</b>：{{ store.shareError.message }}。已保留你本地正在编辑的用例，未做任何改动。
+      </div>
+      <button @click="dismissError" class="shrink-0 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-sm">知道了</button>
+    </div>
+
+    <!-- 越权编辑拒绝提示 -->
+    <div v-if="store.shareNotice" class="mx-4 mt-4 flex items-center justify-between gap-3 bg-orange-900/40 border border-orange-700 rounded-lg px-4 py-3">
+      <div class="text-sm text-orange-200">🚫 {{ store.shareNotice }}</div>
+      <button @click="store.dismissShareNotice()" class="shrink-0 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-sm">关闭</button>
+    </div>
+
     <div class="flex flex-col lg:flex-row gap-4 p-4">
       <div class="lg:w-1/4 space-y-4">
         <RegexEditor />
+        <ShareBar />
         <TemplateLibrary />
       </div>
 
@@ -58,13 +81,48 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useRegexStore } from './store/regex'
+import { parseShareHash, decodeShareCase } from './utils/shareLink'
 import RegexEditor from './components/RegexEditor.vue'
 import NfaVisualizer from './components/NfaVisualizer.vue'
 import MatchHighlight from './components/MatchHighlight.vue'
 import TemplateLibrary from './components/TemplateLibrary.vue'
+import ShareBar from './components/ShareBar.vue'
 
 const store = useRegexStore()
-onMounted(() => store.execute())
+
+onMounted(() => {
+  const data = parseShareHash(window.location.hash)
+  if (data === null) {
+    store.execute()
+    return
+  }
+  const result = decodeShareCase(data)
+  if (result.ok) {
+    // 进入只读分享视图，复现创建时的高亮、分组与步骤
+    store.enterSharedView(result.payload)
+  } else {
+    // 恢复失败：给出说明，保留本地正在编辑的用例
+    store.setShareError(result.error)
+    store.execute()
+  }
+})
+
+function exitShare() {
+  store.exitSharedView()
+  // 清除 hash，避免刷新后再次进入分享视图
+  history.replaceState(null, '', window.location.pathname + window.location.search)
+}
+
+function dismissError() {
+  store.dismissShareError()
+  history.replaceState(null, '', window.location.pathname + window.location.search)
+}
+
+// 越权提示 6 秒后自动消失
+watch(() => store.shareNotice, notice => {
+  if (!notice) return
+  setTimeout(() => store.dismissShareNotice(), 6000)
+})
 </script>

@@ -5,7 +5,7 @@
     <div class="space-y-1 max-h-64 overflow-y-auto">
       <div v-for="t in filtered" :key="t.name"
         @click="store.applyTemplate(t)"
-        :class="['cursor-pointer p-2 rounded-lg border transition-all', store.selectedTemplate === t.name ? 'border-cyan-500 bg-cyan-900/30' : 'border-slate-700 bg-slate-900 hover:border-slate-500']">
+        :class="['cursor-pointer p-2 rounded-lg border transition-all', store.selectedTemplate === t.name ? 'border-cyan-500 bg-cyan-900/30' : 'border-slate-700 bg-slate-900 hover:border-slate-500', store.isSharedView ? 'opacity-50' : '']">
         <div class="flex items-center justify-between">
           <span class="text-sm font-bold text-slate-200">{{ t.name }}</span>
           <span class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">{{ t.category }}</span>

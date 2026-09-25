@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { NFA, MatchResult, MatchStep, RegexTemplate, ASTNode } from '../types'
+import type { NFA, MatchResult, MatchStep, RegexTemplate, ASTNode, SharePayload, ShareError } from '../types'
 
 const GROUP_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6']
 
@@ -106,7 +106,7 @@ function buildNFA(pattern: string): { states: StateNode[]; startState: number; a
         segEnd = newState()
         const matcher = parseCharClass()
         addTransition(segStart, '__class_' + segStart, segEnd)
-        ;(states[segEnd] as any)._matcher = matcher
+        ;(states[segStart] as any)._matcher = matcher
       } else if (ch === '.') {
         segStart = newState()
         segEnd = newState()
@@ -402,6 +402,13 @@ export const useRegexStore = defineStore('regex', () => {
   const error = ref('')
   const selectedTemplate = ref<string>('')
 
+  // 只读分享视图状态
+  const isSharedView = ref(false)
+  const shareError = ref<ShareError | null>(null)
+  const shareNotice = ref('')
+  // 进入分享视图前的本地编辑快照，退出时恢复，避免覆盖本地正在编辑的用例
+  const localSnapshot = ref<{ pattern: string; testString: string } | null>(null)
+
   const groupColors = GROUP_COLORS
 
   const matchHighlight = computed(() => {
@@ -432,21 +439,70 @@ export const useRegexStore = defineStore('regex', () => {
     }
   }
 
+  // 越权编辑守卫：只读分享视图下拒绝一切用例修改
+  function guardEdit(): boolean {
+    if (!isSharedView.value) return true
+    shareNotice.value = '当前为只读分享视图，修改已被拒绝。如需编辑，请点击"退出分享"返回本地用例'
+    return false
+  }
+
   function setPattern(p: string) {
+    if (!guardEdit()) return
     pattern.value = p
     execute()
   }
 
   function setTestString(s: string) {
+    if (!guardEdit()) return
     testString.value = s
     execute()
   }
 
   function applyTemplate(t: RegexTemplate) {
+    if (!guardEdit()) return
     pattern.value = t.pattern
     testString.value = t.testString
     selectedTemplate.value = t.name
     execute()
+  }
+
+  // 进入只读分享视图：先快照本地用例，再加载分享内容并复现匹配
+  function enterSharedView(payload: SharePayload) {
+    if (!isSharedView.value) {
+      localSnapshot.value = { pattern: pattern.value, testString: testString.value }
+    }
+    shareError.value = null
+    shareNotice.value = ''
+    isSharedView.value = true
+    pattern.value = payload.pattern
+    testString.value = payload.testString
+    execute()
+  }
+
+  // 退出分享视图：恢复进入前的本地编辑内容
+  function exitSharedView() {
+    if (!isSharedView.value) return
+    isSharedView.value = false
+    shareNotice.value = ''
+    if (localSnapshot.value) {
+      pattern.value = localSnapshot.value.pattern
+      testString.value = localSnapshot.value.testString
+      localSnapshot.value = null
+    }
+    execute()
+  }
+
+  // 分享链接恢复失败：仅记录错误说明，不触碰本地正在编辑的用例
+  function setShareError(e: ShareError | null) {
+    shareError.value = e
+  }
+
+  function dismissShareError() {
+    shareError.value = null
+  }
+
+  function dismissShareNotice() {
+    shareNotice.value = ''
   }
 
   function stepForward() {
@@ -482,7 +538,9 @@ export const useRegexStore = defineStore('regex', () => {
   return {
     pattern, testString, currentStep, isPlaying, nfa, matchResult, ast, error,
     selectedTemplate, groupColors, matchHighlight,
+    isSharedView, shareError, shareNotice,
     execute, setPattern, setTestString, applyTemplate,
+    enterSharedView, exitSharedView, setShareError, dismissShareError, dismissShareNotice,
     stepForward, stepBackward, resetStep, play, stop
   }
 })
